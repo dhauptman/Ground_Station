@@ -53,6 +53,12 @@ float limitAngleToPMPIf(float angle)
     return angle;
 }
 
+float convertDegToRad(float angle)
+{
+    angle = angle * (float)M_PI/180.0;
+    return angle;
+}
+
 double limitAngleToPMPId(double angle)
 {
     if (angle > -20*M_PI && angle < 20*M_PI)

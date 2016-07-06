@@ -1,9 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <author/>
- <comment/>
- <exportmacro/>
  <class>FlagDisplay</class>
- <widget name="FlagDisplay" class="QWidget">
+ <widget class="QWidget" name="FlagDisplay">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -13,9 +11,41 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Flag Display</string>
   </property>
+  <widget class="QWidget" name="verticalLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>9</y>
+     <width>371</width>
+     <height>281</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="gps_flag">
+      <property name="text">
+       <string>GPS</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="arduino_flag">
+      <property name="text">
+       <string>ARDUINO</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
  </widget>
- <pixmapfunction/>
+ <resources/>
  <connections/>
 </ui>

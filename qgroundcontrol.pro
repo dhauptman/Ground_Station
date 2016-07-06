@@ -213,6 +213,8 @@ INCLUDEPATH += \
 FORMS += \
     src/ui/MainWindow.ui \
     src/QGCQmlWidgetHolder.ui \
+    src/ui/flagdisplay.ui \
+    datadisplay.ui
 
 !MobileBuild {
 FORMS += \
@@ -301,7 +303,9 @@ HEADERS += \
     src/AutoPilotPlugins/APM/APMAirframeLoader.h \
     src/QmlControls/QGCImageProvider.h \
     src/QtLocationPlugin/QMLControl/QGCMapEngineManager.h \
-    src/PositionManager/PositionManager.h
+    src/PositionManager/PositionManager.h \
+    src/ui/flagdisplay.h \
+    datadisplay.h
 
 DebugBuild {
 HEADERS += \
@@ -454,7 +458,9 @@ SOURCES += \
     src/QmlControls/QGCImageProvider.cc \
     src/QtLocationPlugin/QMLControl/QGCMapEngineManager.cc \
     src/PositionManager/SimulatedPosition.cc \
-    src/PositionManager/PositionManager.cpp
+    src/PositionManager/PositionManager.cpp \
+    src/ui/flagdisplay.cpp \
+    datadisplay.cpp
 
 DebugBuild {
 SOURCES += \
@@ -823,3 +829,5 @@ include(QGCSetup.pri)
 #
 
 include(QGCInstaller.pri)
+
+DISTFILES +=

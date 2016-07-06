@@ -1,12 +1,5 @@
-/****************************************************************************
- *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
+/*===================================================================
+======================================================================*/
 
 /**
  * @file
@@ -754,6 +747,255 @@ void UAS::receiveMessage(mavlink_message_t message)
         }
             break;
 
+        case MAVLINK_MSG_ID_customMessage:
+        {
+            mavlink_custommessage_t custom;
+            mavlink_msg_custommessage_decode(&message, &custom);
+
+            quint64 time = getUnixTime(custom.time_usec);
+
+
+            emit attitudeChanged(this, message.compid, QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.roll)), QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.pitch)), QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.yaw)), time);
+
+            if (!wrongComponent)
+            {
+                lastAttitude = time;
+                setRoll(QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.roll)));
+                setPitch(QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.pitch)));
+                setYaw(QGC::limitAngleToPMPIf(QGC::convertDegToRad(custom.yaw)));
+
+                attitudeKnown = true;
+                emit attitudeChanged(this, getRoll(), getPitch(), getYaw(), time);
+                emit attitudeRotationRatesChanged(uasId, custom.p, custom.q, custom.r, time);
+            }
+
+            // TODO: track localization state not only for gps but also for other loc. sources
+            int loc_type = custom.fix_type;
+            if (loc_type == 1)
+            {
+                loc_type = 0;
+            }
+            setSatelliteCount(custom.sat_visible);
+
+            if (custom.fix_type > 2)
+            {
+                isGlobalPositionKnown = true;
+
+                latitude_gps = custom.latitude;
+                longitude_gps = custom.longitude;
+                altitude_gps = custom.altitude;
+
+                // If no GLOBAL_POSITION_INT messages ever received, use these raw GPS values instead.
+                if (!globalEstimatorActive) {
+                    setLatitude(latitude_gps);
+                    setLongitude(longitude_gps);
+                    emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeAMSL(), time);
+                    emit altitudeChanged(this, altitudeAMSL, altitudeRelative, -speedZ, time);
+
+                    float vel = custom.gps_velocity;
+                    // Smaller than threshold and not NaN
+                    if ((vel < 1000000) && !qIsNaN(vel) && !qIsInf(vel)) {
+                        setGroundSpeed(vel);
+                        emit speedChanged(this, groundSpeed, airSpeed, time);
+                    } else {
+                        emit textMessageReceived(uasId, message.compid, MAV_SEVERITY_NOTICE, QString("GCS ERROR: RECEIVED INVALID SPEED OF %1 m/s").arg(vel));
+                    }
+                }
+            }
+
+            double dtmp;
+            //-- Raw GPS data
+            dtmp = custom.eph == 0xFFFF ? 1e10f : custom.eph / 100.0;
+            if(dtmp != satRawHDOP)
+            {
+                satRawHDOP = dtmp;
+                emit satRawHDOPChanged(satRawHDOP);
+            }
+            dtmp = custom.epv == 0xFFFF ? 1e10f : custom.epv / 100.0;
+            if(dtmp != satRawVDOP)
+            {
+                satRawVDOP = dtmp;
+                emit satRawVDOPChanged(satRawVDOP);
+            }
+            dtmp = custom.cog == 0xFFFF ? 0.0 : custom.cog / 100.0;
+            if(dtmp != satRawCOG)
+            {
+                satRawCOG = dtmp;
+                emit satRawCOGChanged(satRawCOG);
+            }
+
+            // Emit this signal after the above signals. This way a trigger on gps lock signal which then asks for vehicle position
+            // gets a good position.
+            emit localizationChanged(this, loc_type);
+            // Emit flags
+            emit MESSAGEChanged(message);
+            emit GPSFlagChanged(custom.vector_nav_flag);
+            emit ARDUINOFlagChanged(custom.arduino_flag);
+            // Testing
+            QString name = QString("M%1:customMessage.%2").arg(message.sysid);
+            emit valueChanged(uasId, name.arg("gps_time"), "sec", custom.gps_time, time);
+            emit valueChanged(uasId, name.arg("gps_week"), " ", custom.gps_week, time);
+            emit valueChanged(uasId, name.arg("air_velocity"), "m/s", custom.air_velocity, time);
+            emit valueChanged(uasId, name.arg("gps_velocity"), "m/s", custom.gps_velocity, time);
+            emit valueChanged(uasId, name.arg("alpha_est"), "deg/s", custom.alpha_est, time);
+            emit valueChanged(uasId, name.arg("beta_est"), "deg/s", custom.beta_est, time);
+            emit valueChanged(uasId, name.arg("yaw"), "deg", custom.yaw, time);
+            emit valueChanged(uasId, name.arg("pitch"), "deg", custom.pitch, time);
+            emit valueChanged(uasId, name.arg("roll"), "deg", custom.roll, time);
+            emit valueChanged(uasId, name.arg("p"), "deg/s", custom.p, time);
+            emit valueChanged(uasId, name.arg("q"), "deg/s", custom.q, time);
+            emit valueChanged(uasId, name.arg("r"), "deg/s", custom.r, time);
+            emit valueChanged(uasId, name.arg("longitude"), "deg", custom.longitude, time);
+            emit valueChanged(uasId, name.arg("latitude"), "deg", custom.latitude, time);
+            emit valueChanged(uasId, name.arg("altitude"), "m", custom.altitude, time);
+            emit valueChanged(uasId, name.arg("rc_throttle"), "us", custom.rc_throttle, time);
+            emit valueChanged(uasId, name.arg("rc_aileron"), "us", custom.rc_aileron, time);
+            emit valueChanged(uasId, name.arg("rc_elevator"), "us", custom.rc_elevator, time);
+            emit valueChanged(uasId, name.arg("rc_rudder"), "us", custom.rc_rudder, time);
+            emit valueChanged(uasId, name.arg("autopilot_throttle"), "%", custom.autopilot_throttle, time);
+            emit valueChanged(uasId, name.arg("autopilot_aileron"), "us", custom.autopilot_aileron, time);
+            emit valueChanged(uasId, name.arg("autopilot_elevator"), "us", custom.autopilot_elevator, time);
+            emit valueChanged(uasId, name.arg("autopilot_rudder"), "us", custom.autopilot_rudder, time);
+            emit valueChanged(uasId, name.arg("distance_to_waypoint"), "m", custom.distance_to_waypoint, time);
+            emit valueChanged(uasId, name.arg("waypoint_index"), "m", custom.waypoint_index, time);
+            emit valueChanged(uasId, name.arg("battery_voltage"), "V", custom.battery_voltage, time);
+            emit valueChanged(uasId, name.arg("total_flight_time"), "sec", custom.total_flight_time, time);
+            emit valueChanged(uasId, name.arg("pressure_altitude"), " ", custom.pressure_altitude, time);
+            emit valueChanged(uasId, name.arg("eph"), " ", custom.eph, time);
+            emit valueChanged(uasId, name.arg("epv"), " ", custom.epv, time);
+            emit valueChanged(uasId, name.arg("cog"), "deg", custom.cog, time);
+            emit valueChanged(uasId, name.arg("arduino_flag"), " ", custom.arduino_flag, time);
+            emit valueChanged(uasId, name.arg("vector_nav_flag"), " ", custom.vector_nav_flag, time);
+            emit valueChanged(uasId, name.arg("ann_status_flag"), " ", custom.ann_status_flag, time);
+            emit valueChanged(uasId, name.arg("fix_type"), " ", custom.fix_type, time);
+            emit valueChanged(uasId, name.arg("sat_visible"), " ", custom.sat_visible, time);
+        }
+            break;
+
+        case MAVLINK_MSG_ID_QUAD_MESSAGE:
+            {
+            mavlink_quad_message_t quad;
+            mavlink_msg_quad_message_decode(&message, &quad);
+
+            quint64 time = getUnixTime(quad.time);
+
+
+            emit attitudeChanged(this, message.compid, QGC::limitAngleToPMPIf(quad.phi), QGC::limitAngleToPMPIf(quad.theta), QGC::limitAngleToPMPIf(quad.psi), time);
+
+            if (!wrongComponent)
+            {
+                lastAttitude = time;
+                setRoll(QGC::limitAngleToPMPIf(quad.phi));
+                setPitch(QGC::limitAngleToPMPIf(quad.theta));
+                setYaw(QGC::limitAngleToPMPIf(quad.psi));
+
+                attitudeKnown = true;
+                emit attitudeChanged(this, getRoll(), getPitch(), getYaw(), time);
+                emit attitudeRotationRatesChanged(uasId, quad.p, quad.q, quad.r, time);
+            }
+
+            // TODO: track localization state not only for gps but also for other loc. sources
+            int loc_type = quad.fix_type;
+            if (loc_type == 1)
+            {
+                loc_type = 0;
+            }
+            setSatelliteCount(quad.sat_visible);
+
+            if (quad.fix_type > 2)
+            {
+                isGlobalPositionKnown = true;
+
+                latitude_gps = quad.latitude;
+                longitude_gps = quad.longitude;
+                altitude_gps = quad.altitude;
+
+                // If no GLOBAL_POSITION_INT messages ever received, use these raw GPS values instead.
+                if (!globalEstimatorActive) {
+                    setLatitude(latitude_gps);
+                    setLongitude(longitude_gps);
+                    emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeAMSL(), time);
+                    emit altitudeChanged(this, altitudeAMSL, altitudeRelative, -speedZ, time);
+
+                    float vel = quad.gps_velocity;
+                    // Smaller than threshold and not NaN
+                    if ((vel < 1000000) && !qIsNaN(vel) && !qIsInf(vel)) {
+                        setGroundSpeed(vel);
+                        emit speedChanged(this, groundSpeed, airSpeed, time);
+                    } else {
+                        emit textMessageReceived(uasId, message.compid, MAV_SEVERITY_NOTICE, QString("GCS ERROR: RECEIVED INVALID SPEED OF %1 m/s").arg(vel));
+                    }
+                }
+            }
+
+            double dtmp;
+            //-- Raw GPS data
+            dtmp = quad.eph == 0xFFFF ? 1e10f : quad.eph / 100.0;
+            if(dtmp != satRawHDOP)
+            {
+                satRawHDOP = dtmp;
+                emit satRawHDOPChanged(satRawHDOP);
+            }
+            dtmp = quad.epv == 0xFFFF ? 1e10f : quad.epv / 100.0;
+            if(dtmp != satRawVDOP)
+            {
+                satRawVDOP = dtmp;
+                emit satRawVDOPChanged(satRawVDOP);
+            }
+            dtmp = quad.cog == 0xFFFF ? 0.0 : quad.cog / 100.0;
+            if(dtmp != satRawCOG)
+            {
+                satRawCOG = dtmp;
+                emit satRawCOGChanged(satRawCOG);
+            }
+
+            // Emit this signal after the above signals. This way a trigger on gps lock signal which then asks for vehicle position
+            // gets a good position.
+            emit localizationChanged(this, loc_type);
+            // Emit flags
+            emit GPSFlagChanged(quad.vector_nav_flag);
+            emit ARDUINOFlagChanged(quad.arduino_flag);
+            // Emit for Units
+            emit valueChanged(uasId, "phi", "deg", quad.phi, time);
+            emit valueChanged(uasId, "theta", "deg", quad.theta, time);
+            emit valueChanged(uasId, "psi", "deg", quad.psi, time);
+            emit valueChanged(uasId, "longitude", "deg", quad.longitude, time);
+            emit valueChanged(uasId, "latitude", "deg", quad.latitude, time);
+            emit valueChanged(uasId, "altitude", "m", quad.altitude, time);
+            emit valueChanged(uasId, "Vn", "m/s", quad.Vn, time);
+            emit valueChanged(uasId, "Ve", "m/s", quad.Ve, time);
+            emit valueChanged(uasId, "Vd", "m/s", quad.Vd, time);
+            emit valueChanged(uasId, "Ax", "m/s/s", quad.Ax, time);
+            emit valueChanged(uasId, "Ay", "m/s/s", quad.Ay, time);
+            emit valueChanged(uasId, "Az", "m/s/s", quad.Az, time);
+            emit valueChanged(uasId, "p", "deg/s", quad.p, time);
+            emit valueChanged(uasId, "q", "deg/s", quad.q, time);
+            emit valueChanged(uasId, "r", "deg/s", quad.r, time);
+            emit valueChanged(uasId, "local_N", "m", quad.local_N, time);
+            emit valueChanged(uasId, "local_E", "m", quad.local_E, time);
+            emit valueChanged(uasId, "local_D", "m", quad.local_D, time);
+            emit valueChanged(uasId, "voltage", "V", quad.voltage, time);
+            emit valueChanged(uasId, "current_1", "A", quad.current_1, time);
+            emit valueChanged(uasId, "current_2", "A", quad.current_2, time);
+            emit valueChanged(uasId, "current_3", "A", quad.current_3, time);
+            emit valueChanged(uasId, "current_4", "A", quad.current_4, time);
+            emit valueChanged(uasId, "rpm_1", "", quad.rpm_1, time);
+            emit valueChanged(uasId, "rpm_2", "", quad.rpm_2, time);
+            emit valueChanged(uasId, "rpm_3", "", quad.rpm_3, time);
+            emit valueChanged(uasId, "rpm_4", "", quad.rpm_4, time);
+            emit valueChanged(uasId, "pwm_1", "us", quad.pwm_1, time);
+            emit valueChanged(uasId, "pwm_2", "us", quad.pwm_2, time);
+            emit valueChanged(uasId, "pwm_3", "us", quad.pwm_3, time);
+            emit valueChanged(uasId, "pwm_4", "us", quad.pwm_4, time);
+            emit valueChanged(uasId, "cmd_pwm_1", "us", quad.cmd_pwm_1, time);
+            emit valueChanged(uasId, "cmd_pwm_2", "us", quad.cmd_pwm_2, time);
+            emit valueChanged(uasId, "cmd_pwm_3", "us", quad.cmd_pwm_3, time);
+            emit valueChanged(uasId, "cmd_pwm_4", "us", quad.cmd_pwm_4, time);
+
+
+            }
+                    break;
+
         default:
             break;
         }
@@ -808,7 +1050,7 @@ void UAS::startCalibration(UASInterface::StartCalibrationType calType)
                                   mavlink->getComponentId(),
                                   &msg,
                                   uasId,
-                                  _vehicle->defaultComponentId(),   // target component
+                                  0,                                // target component
                                   MAV_CMD_PREFLIGHT_CALIBRATION,    // command id
                                   0,                                // 0=first transmission of command
                                   gyroCal,                          // gyro cal
@@ -832,7 +1074,7 @@ void UAS::stopCalibration(void)
                                   mavlink->getComponentId(),
                                   &msg,
                                   uasId,
-                                  _vehicle->defaultComponentId(),   // target component
+                                  0,                                // target component
                                   MAV_CMD_PREFLIGHT_CALIBRATION,    // command id
                                   0,                                // 0=first transmission of command
                                   0,                                // gyro cal
@@ -867,8 +1109,8 @@ void UAS::startBusConfig(UASInterface::StartBusConfigType calType)
                                   mavlink->getComponentId(),
                                   &msg,
                                   uasId,
-                                  _vehicle->defaultComponentId(),   // target component
-                                  MAV_CMD_PREFLIGHT_UAVCAN,         // command id
+                                  0,                                // target component
+                                  MAV_CMD_PREFLIGHT_UAVCAN,    // command id
                                   0,                                // 0=first transmission of command
                                   actuatorCal,                      // actuators
                                   0,
@@ -891,8 +1133,8 @@ void UAS::stopBusConfig(void)
                                   mavlink->getComponentId(),
                                   &msg,
                                   uasId,
-                                  _vehicle->defaultComponentId(),   // target component
-                                  MAV_CMD_PREFLIGHT_UAVCAN,         // command id
+                                  0,                                // target component
+                                  MAV_CMD_PREFLIGHT_UAVCAN,    // command id
                                   0,                                // 0=first transmission of command
                                   0,
                                   0,

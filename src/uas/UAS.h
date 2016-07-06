@@ -289,6 +289,40 @@ public:
         return yaw;
     }
 
+    void setGPSFlag(quint8 val)
+    {
+        gps_flag = val;
+        emit GPSFlagChanged(gps_flag);
+    }
+
+    quint8 getGPSFlag() const
+    {
+        return gps_flag;
+    }
+
+    void setARDUINOFlag(quint8 val)
+    {
+        arduino_flag = val;
+        emit ARDUINOFlagChanged(arduino_flag);
+    }
+
+
+
+    quint8 getARDUINOFlag() const
+    {
+        return arduino_flag;
+    }
+
+    void setMESSAGE(mavlink_message_t message)
+    {
+        customMessage = message;
+        emit MESSAGEChanged(customMessage);
+    }
+
+    mavlink_message_t getMESSAGE() const
+    {
+        return customMessage;
+    }
     // Setters for HIL noise variance
     void setXaccVar(float var){
         xacc_var = var;
@@ -351,6 +385,7 @@ protected: //COMMENTS FOR TEST UNIT
     int uasId;                    ///< Unique system ID
     QMap<int, QString> components;///< IDs and names of all detected onboard components
 
+
     QList<int> unknownPackets;    ///< Packet IDs which are unknown and have been received
     MAVLinkProtocol* mavlink;     ///< Reference to the MAVLink instance
     float receiveDropRate;        ///< Percentage of packets that were dropped on the MAV's receiving link (from GCS and other MAVs)
@@ -358,6 +393,14 @@ protected: //COMMENTS FOR TEST UNIT
 
     /// BASIC UAS TYPE, NAME AND STATE
     int status;                   ///< The current status of the MAV
+
+    /// ERROR FLAGS SENT
+    quint8 arduino_flag;
+    quint8 gps_flag;
+
+    /// MAVLINK MESSAGE SENT
+    mavlink_message_t customMessage;
+
 
     /// TIMEKEEPING
     quint64 startTime;            ///< The time the UAS was switched on
@@ -576,6 +619,11 @@ signals:
     void groundSpeedChanged(double val, QString name);
     void airSpeedChanged(double val, QString name);
     void bearingToWaypointChanged(double val,QString name);
+
+    void GPSFlagChanged(quint8 val);
+    void ARDUINOFlagChanged(quint8 val);
+    void MESSAGEChanged(mavlink_message_t message);
+
 protected:
     /** @brief Get the UNIX timestamp in milliseconds, enter microseconds */
     quint64 getUnixTime(quint64 time=0);
