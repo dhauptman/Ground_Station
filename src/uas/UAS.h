@@ -306,8 +306,6 @@ public:
         emit ARDUINOFlagChanged(arduino_flag);
     }
 
-
-
     quint8 getARDUINOFlag() const
     {
         return arduino_flag;
